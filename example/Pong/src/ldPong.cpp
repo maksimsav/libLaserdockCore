@@ -21,13 +21,23 @@ ldPong::~ldPong()
 {
 }
 
+using GameState = ldAbstractGameVisualizer::ldGameState;
+
 bool ldPong::handleKeyEvent(QKeyEvent *keyEvent)
 {
     if(keyEvent->type() == QEvent::KeyPress) {
         switch (keyEvent->key()) {
+        case Qt::Key_1:
+            // set one player mode
+            m_visualizer->setTwoPlayersMode(false);
+            break;
+        case Qt::Key_2:
+            // set two players mode
+            m_visualizer->setTwoPlayersMode(true);
+            break;
         case Qt::Key_W:
-            m_visualizer->move1Up(true);
             // player 1 up key
+            m_visualizer->move1Up(true);
             break;
         case Qt::Key_S:
             // player 1 down key

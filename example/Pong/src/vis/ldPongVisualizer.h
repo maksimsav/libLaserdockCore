@@ -28,6 +28,7 @@ public:
     // ldVisualizer
     
     virtual QString visualizerName() const override { return "Pong"; }
+    void setTwoPlayersMode(bool enabled);
 
 public slots:
     void move1Up(bool keyPress);
@@ -105,9 +106,14 @@ private:
     bool m_keyPressedDown = false;
     float m_axis = 0.f;
 
+    bool m_twoPlayersMode = false;
+    bool m_modeSelection = true;
 
     std::pair<int, int> m_score;
     QScopedPointer<ldTextLabel> m_scoreLabel;
+    QScopedPointer<ldTextLabel> m_menuLabel1;
+    QScopedPointer<ldTextLabel> m_menuLabel2;
+    QScopedPointer<ldTextLabel> m_modeLabel;
 
     QTimer m_timer;
     QScopedPointer<ldTextLabel> m_stateLabel;

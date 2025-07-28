@@ -38,6 +38,18 @@ ldPongVisualizer::ldPongVisualizer() : ldAbstractGameVisualizer() {
     m_scoreLabel.reset(new ldTextLabel());
     m_scoreLabel->setColor(0xFFFFFF);
 
+    m_menuLabel1.reset(new ldTextLabel("PRESS 1 FOR SINGLE PLAYER", 1.0f / 24));
+    m_menuLabel1->setColor(C_WHITE);
+    float menuLabel1X = 0.5f - m_menuLabel1->getWidth() / 2.0f;
+    m_menuLabel1->setPosition(ldVec2(menuLabel1X, 0.82f));
+
+    m_menuLabel2.reset(new ldTextLabel("PRESS 2 FOR TWO PLAYERS", 1.0f / 24));
+    m_menuLabel2->setColor(C_WHITE);
+    m_menuLabel2->setPosition(ldVec2(menuLabel1X, 0.75f));
+
+    m_modeLabel.reset(new ldTextLabel("", 1.0f / 24));
+    m_modeLabel->setColor(C_WHITE);
+
     m_timer.setInterval(1000); // 1 sec
     connect(&m_timer, &QTimer::timeout, this, &ldPongVisualizer::onTimerTimeout);
 
@@ -109,29 +121,44 @@ void ldPongVisualizer::draw() {
     m_safeDrawing = 0;
 
     //Board: MEO jumpiness fix
-    if(!m_timer.isActive()) {
-        if (m_keyPressedUp) { //MEO: when added A.I., swapped player keys
-            moveBoard(0, BOARD_STEP);
-        }
-        if (m_keyPressedDown) {
-            moveBoard(0, -1*BOARD_STEP);
-        }
-        if(m_axis < 0.05f || m_axis > 0.05f) {
-            moveBoard(0, BOARD_STEP * m_axis * 1.5f);
-        }
-    }
-    if (m_keyPressedUpBoard1) { //MEO: when added A.I., swapped player keys
-        //boardUp(1); //ToDo -reimplement when AI/2nd player choice
-    }
-    if (m_keyPressedDownBoard1) {
-        //boardDown(1);
-    }
+    if(!m_timer.isActive() && !m_modeSelection) {
+        if (m_twoPlayersMode) {
+            if (m_keyPressedUpBoard1) {
+                moveBoard(0, BOARD_STEP);
+            }
+            if (m_keyPressedDownBoard1) {
+                moveBoard(0, -BOARD_STEP);
+            }
+            if (m_keyPressedUp) {
+                moveBoard(1, BOARD_STEP);
+            }
+            if (m_keyPressedDown) {
+                moveBoard(1, -BOARD_STEP);
+            }
+            if (std::abs(m_axis) > 0.05f) {
+                moveBoard(1, BOARD_STEP * m_axis * 1.5f);
+            }
+        } else {
+            if (m_keyPressedUp) { //MEO: when added A.I., swapped player keys
+                moveBoard(0, BOARD_STEP);
+            }
+            if (m_keyPressedDown) {
+                moveBoard(0, -1*BOARD_STEP);
+            }
+            if(m_axis < 0.05f || m_axis > 0.05f) {
+                moveBoard(0, BOARD_STEP * m_axis * 1.5f);
+            }
 
-    //A.I.
-    m_secondBoardBottomY += 0.1f * (((1.0f + m_ballPos.y) - ((1.0f + m_secondBoardBottomY) + (BOARD_LENGTH / 2.0f))) * qPow((1.0f + m_ballPos.x) / 2.0f, 2.5f));
-    m_secondBoardBottomY = std::max(m_secondBoardBottomY, MIN_Y);
-    m_secondBoardBottomY = std::min(m_secondBoardBottomY, MAX_Y);
-    if (m_secondBoardBottomY != m_secondBoardBottomY) m_secondBoardBottomY = MIN_Y; //check for infinity and correct
+            float dy = ((1.0f + m_ballPos.y) - ((1.0f + m_secondBoardBottomY) + (BOARD_LENGTH / 2.0f)));
+            float weight = qPow((1.0f + m_ballPos.x) / 2.0f, 2.5f);
+            m_secondBoardBottomY += 0.1f * dy * weight;
+        }
+
+        m_secondBoardBottomY = std::clamp(m_secondBoardBottomY, MIN_Y, MAX_Y);
+        if (m_secondBoardBottomY != m_secondBoardBottomY) {
+            m_secondBoardBottomY = MIN_Y;
+        }
+    }
 
     /*
      * DRAW
@@ -171,6 +198,19 @@ void ldPongVisualizer::draw() {
     // timer
     if(state() != ldGameState::Reset) {
         m_stateLabel->innerDraw(m_renderer);
+    }
+
+    // menu
+    if (m_modeSelection && state() != ldGameState::Reset) {
+        m_menuLabel1->innerDraw(m_renderer);
+        m_menuLabel2->innerDraw(m_renderer);
+    }
+
+    // mode
+    if (!m_modeSelection && state() != ldGameState::Reset) {
+        m_modeLabel->setText(m_twoPlayersMode ? "2 PLAYERS" : "1 PLAYER");
+        m_modeLabel->setPosition(ldVec2(0.5f - m_modeLabel->getWidth() / 2.0f, 0.04f));
+        m_modeLabel->innerDraw(m_renderer);
     }
 
     // board left: first one is left
@@ -269,7 +309,7 @@ void ldPongVisualizer::draw() {
     }
 
     // next ball pos
-    if(state() == ldGameState::Playing && !m_timer.isActive()) {
+    if(state() == ldGameState::Playing && !m_timer.isActive() && !m_modeSelection) {
         m_ballPos.x += m_ballSpeedVector.x;
         m_ballPos.y += m_ballSpeedVector.y;
     }
@@ -350,6 +390,7 @@ void ldPongVisualizer::onTimerTimeout() {
 
 void ldPongVisualizer::onGameReset()
 {
+    m_modeSelection = true;
     resetMatch();
 }
 
@@ -434,10 +475,12 @@ void ldPongVisualizer::resetMatch() {
 }
 
 void ldPongVisualizer::startTimer() {
-    m_startGameTimerValue = GAME_DEFAULT_RESET_TIME;
-    QMetaObject::invokeMethod(&m_timer, "start", Qt::QueuedConnection);
+    if (!m_modeSelection) {
+        m_startGameTimerValue = GAME_DEFAULT_RESET_TIME;
+        QMetaObject::invokeMethod(&m_timer, "start", Qt::QueuedConnection);
 
-    updateTimerLabel();
+        updateTimerLabel();
+    }
 }
 
 
@@ -460,3 +503,11 @@ void ldPongVisualizer::updateTimerLabel() {
     centerTimerLabel();
 }
 
+void ldPongVisualizer::setTwoPlayersMode(bool enabled) {
+    QMutexLocker lock(&m_mutex);
+    if (m_modeSelection) {
+        m_twoPlayersMode = enabled;
+        m_modeSelection = false;
+        startTimer();
+    }
+}
